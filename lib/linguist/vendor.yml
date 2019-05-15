@@ -90,10 +90,13 @@
 - (^|/)select2/.*\.(css|scss|js)$
 
 # Vendored dependencies
-- (3rd|[Tt]hird)[-_]?[Pp]arty/
-- vendors?/
-- extern(al)?/
-- (^|/)[Vv]+endor/
+#- (3rd|[Tt]hird)[-_]?[Pp]arty/
+#- vendors?/
+#- extern(al)?/
+#- (^|/)[Vv]+endor/
+
+# Jetbrains IDE
+- \.idea/
 
 # Debian packaging
 - ^debian/

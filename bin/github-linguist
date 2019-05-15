@@ -7,42 +7,80 @@ require 'rugged'
 require 'json'
 require 'optparse'
 
-path = ARGV[0] || Dir.pwd
+$stats_size = Hash.new(0)
+$stats_repo_size = 0
+total_cnt = 0
 
-# special case if not given a directory
-# but still given the --breakdown or --json options/
-if path == "--breakdown"
-  path = Dir.pwd
-  breakdown = true
-elsif path == "--json"
-  path = Dir.pwd
-  json_breakdown = true
+def repo_stats(repo)
+  $stats_repo_size += repo.size
+  repo.languages.sort_by { |_, size| size }.reverse.each do |language, size|
+    $stats_size[language] += size
+  end
 end
 
-ARGV.shift
-breakdown = true if ARGV[0] == "--breakdown"
-json_breakdown = true if ARGV[0] == "--json"
+def file_breakdown(repo, path="")
+  puts
+  file_breakdown = repo.breakdown_by_file
+  file_breakdown.each do |lang, files|
+    puts "#{lang}:"
+    files.each do |file|
+      puts File.join(path, file)
+    end
+    puts
+  end
+end
+
+options = {
+  watermark: 1.0,
+  path: Dir.pwd,
+  breakdown: false,
+  json: false
+}
+OptionParser.new do |opt|
+  opt.on('-j', '--json') { |v| options[:json] = v }
+  opt.on('-b', '--breakdown') { |v| options[:breakdown] = v }
+  opt.on('-p', '--path PATH') { |v| options[:path] = v }
+  opt.on('-w', '--watermark WATERMARK', Float) { |v| options[:watermark] = v }
+end.parse!
+
+path = options[:path]
+breakdown = options[:breakdown]
+json_breakdown = options[:breakdown]
+watermark = options[:watermark]
 
 if File.directory?(path)
   rugged = Rugged::Repository.new(path)
-  repo = Linguist::Repository.new(rugged, rugged.head.target_id)
-  if !json_breakdown
-    repo.languages.sort_by { |_, size| size }.reverse.each do |language, size|
-      percentage = ((size / repo.size.to_f) * 100)
-      percentage = sprintf '%.2f' % percentage
-      puts "%-7s %s" % ["#{percentage}%", language]
+
+  rugged.submodules.each do |sb|
+    sb_rugged = Rugged::Repository.new(File.join(path, sb.path ))
+    sb_repo = Linguist::Repository.new(sb_rugged, sb_rugged.head.target_id)
+    if !json_breakdown
+      repo_stats(sb_repo)
     end
   end
+  repo = Linguist::Repository.new(rugged, rugged.head.target_id)
+  if !json_breakdown
+    repo_stats(repo)
+  end
+
+  $stats_size.sort_by { |_, size| size }.reverse.each do |language, size|
+    percentage = ((size / $stats_repo_size.to_f) * 100)
+    total_cnt = total_cnt + percentage
+    next if percentage < watermark
+    percentage = sprintf '%.2f' % percentage
+    puts "%-7s %s" % ["#{percentage}%", "#{language}"]
+  end
+  if !json_breakdown
+    puts "%-7s Total" % ["#{total_cnt}%"]
+  end
+
   if breakdown
-    puts
-    file_breakdown = repo.breakdown_by_file
-    file_breakdown.each do |lang, files|
-      puts "#{lang}:"
-      files.each do |file|
-        puts file
-      end
-      puts
+    rugged.submodules.each do |sb|
+      sb_rugged = Rugged::Repository.new(File.join(path, sb.path))
+      sb_repo = Linguist::Repository.new(sb_rugged, sb_rugged.head.target_id)
+      file_breakdown(sb_repo, sb.path)
     end
+    file_breakdown(repo)
   elsif json_breakdown
     puts JSON.dump(repo.breakdown_by_file)
   end
@@ -72,13 +110,5 @@ elsif File.file?(path)
   if blob.vendored?
     puts "  appears to be a vendored file"
   end
-else
-  abort <<-HELP
-  Linguist v#{Linguist::VERSION}
-  Detect language type for a file, or, given a repository, determine language breakdown.
-
-  Usage: linguist <path>
-         linguist <path> [--breakdown] [--json]
-         linguist [--breakdown] [--json]
-  HELP
 end
+

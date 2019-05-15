@@ -59,8 +59,7 @@ module Linguist
       generated_net_specflow_feature_file? ||
       composer_lock? ||
       cargo_lock? ||
-      node_modules? ||
-      go_vendor? ||
+      node_modules? || #go_vendor? ||
       go_lock? ||
       npm_shrinkwrap_or_package_lock? ||
       godeps? ||
