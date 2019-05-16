@@ -34,24 +34,27 @@ options = {
   watermark: 1.0,
   path: Dir.pwd,
   breakdown: false,
-  json: false
+  json: false,
+  submodules: false
 }
 OptionParser.new do |opt|
   opt.on('-j', '--json') { |v| options[:json] = v }
   opt.on('-b', '--breakdown') { |v| options[:breakdown] = v }
   opt.on('-p', '--path PATH') { |v| options[:path] = v }
   opt.on('-w', '--watermark WATERMARK', Float) { |v| options[:watermark] = v }
+  opt.on('-s', '--submodules') { |v| options[:submodules] = v }
 end.parse!
 
 path = options[:path]
 breakdown = options[:breakdown]
 json_breakdown = options[:breakdown]
 watermark = options[:watermark]
+submodules = options[:submodules]
 
 if File.directory?(path)
   rugged = Rugged::Repository.new(path)
 
-  rugged.submodules.each do |sb|
+  submodules && rugged.submodules.each do |sb|
     sb_rugged = Rugged::Repository.new(File.join(path, sb.path ))
     sb_repo = Linguist::Repository.new(sb_rugged, sb_rugged.head.target_id)
     if !json_breakdown
