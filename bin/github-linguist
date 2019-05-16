@@ -63,15 +63,22 @@ if File.directory?(path)
     repo_stats(repo)
   end
 
+  others_percentage = 0.0
   $stats_size.sort_by { |_, size| size }.reverse.each do |language, size|
     percentage = ((size / $stats_repo_size.to_f) * 100)
-    total_cnt = total_cnt + percentage
-    next if percentage < watermark
+    total_cnt += percentage
+    if percentage < watermark
+      others_percentage += percentage
+      next
+    end
     percentage = sprintf '%.2f' % percentage
     puts "%-7s %s" % ["#{percentage}%", "#{language}"]
   end
   if !json_breakdown
-    puts "%-7s Total" % ["#{total_cnt}%"]
+    others_lang = sprintf 'Others < %.2f' % watermark
+    percentage = sprintf '%.2f' % others_percentage
+    puts "%-7s %s" % ["#{percentage}%", "#{others_lang}%"]
+    puts "%-7s Total" % total_cnt
   end
 
   if breakdown
